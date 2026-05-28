@@ -124,7 +124,7 @@ bot.on('message:text', async (ctx) => {
     state.phone = phone;
 
     try {
-      const mtproto = createNewClient();
+      const mtproto = createNewClient(`${userId}`);
       const { phone_code_hash } = await sendCode(mtproto, phone);
       state.phoneCodeHash = phone_code_hash;
       state.step = 'code';

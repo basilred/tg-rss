@@ -17,9 +17,12 @@ export const getClient = (userId: number): InstanceType<typeof MTProto> => {
       .query('SELECT encrypted_session_data FROM user_sessions WHERE user_id = ? AND is_active = 1')
       .get(userId) as { encrypted_session_data: string } | undefined;
 
+    const dataDir = process.env.DATA_DIR || '/data';
+
     client = new MTProto({
       api_id: API_ID,
       api_hash: API_HASH,
+      storageOptions: { path: `${dataDir}/mtproto-${userId}` },
     });
 
     if (row) {
@@ -43,10 +46,15 @@ export const clearClient = (userId: number): void => {
   clients.delete(userId);
 };
 
-export const createNewClient = (): InstanceType<typeof MTProto> => {
+export const createNewClient = (tempId?: string): InstanceType<typeof MTProto> => {
+  const path = tempId
+    ? `${process.env.DATA_DIR || '/data'}/mtproto-temp-${tempId}`
+    : undefined;
+
   return new MTProto({
     api_id: API_ID,
     api_hash: API_HASH,
+    ...(path ? { storageOptions: { path } } : {}),
   });
 };
 
