@@ -27,7 +27,8 @@ export const getClient = (userId: number): typeof MTProto => {
     });
 
     if (row) {
-      decryptSession(row.encrypted_session_data);
+      const sessionData = decryptSession(row.encrypted_session_data);
+      client.storage.set('session', sessionData);
     }
 
     clients.set(userId, client);
