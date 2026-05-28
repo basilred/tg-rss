@@ -1,0 +1,24 @@
+{
+  "name": "tg-rss",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/server/index.ts",
+    "dev:web": "cd src/web && bunx vite",
+    "build:web": "cd src/web && bunx vite build --outDir ../../dist/web",
+    "lint": "eslint src/",
+    "typecheck": "bun run tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "grammy": "^1.30.0",
+    "@mtproto/core": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.6.0",
+    "@eslint/js": "^9.0.0",
+    "typescript-eslint": "^8.0.0"
+  }
+}
