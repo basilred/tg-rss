@@ -37,6 +37,46 @@ subscriptions.post('/', async (c) => {
   return c.json({ ok: true });
 });
 
+subscriptions.post('/import', async (c) => {
+  const userId = c.get('userId');
+  const db = getDb();
+
+  const session = db
+    .query('SELECT is_active FROM user_sessions WHERE user_id = ?')
+    .get(userId) as { is_active: number } | undefined;
+
+  if (!session?.is_active) {
+    return c.json({ error: 'No active session. Send /login to the bot first.' }, 400);
+  }
+
+  try {
+    const { getClient, getDialogs } = await import('../mtproto/client');
+    const client = getClient(userId);
+    const channels = await getDialogs(client);
+
+    const insertChannel = db.prepare(
+      'INSERT OR REPLACE INTO channels (id, username, title, photo_url) VALUES (?, ?, ?, ?)',
+    );
+    const insertSub = db.prepare(
+      'INSERT OR IGNORE INTO subscriptions (user_id, channel_id) VALUES (?, ?)',
+    );
+
+    const tx = db.transaction(() => {
+      for (const ch of channels) {
+        insertChannel.run(ch.id, ch.username, ch.title, ch.photoUrl);
+        insertSub.run(userId, ch.id);
+      }
+    });
+
+    tx();
+
+    return c.json({ imported: channels.length });
+  } catch (err) {
+    console.error(`User ${userId}: import error`, err);
+    return c.json({ error: 'Import failed' }, 500);
+  }
+});
+
 subscriptions.delete('/:channelId', (c) => {
   const userId = c.get('userId');
   const channelId = Number(c.req.param('channelId'));

@@ -52,6 +52,8 @@ export const api = {
       }),
     remove: (channelId: number) =>
       request(`/subscriptions/${channelId}`, { method: 'DELETE' }),
+    import: () =>
+      request<{ imported: number }>('/subscriptions/import', { method: 'POST' }),
   },
   folders: {
     list: () =>

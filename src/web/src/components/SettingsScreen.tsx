@@ -48,6 +48,16 @@ export const SettingsScreen = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['folders'] }),
   });
 
+  const importChannels = useMutation({
+    mutationFn: () => api.subscriptions.import(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      alert(`Импортировано ${data.imported} каналов`);
+    },
+    onError: () => alert('Ошибка импорта. Проверь, что отправил /login боту.'),
+  });
+
   const handleSearch = async () => {
     if (searchQuery.length < 2) return;
     const results = await api.channels.search(searchQuery);
@@ -62,7 +72,15 @@ export const SettingsScreen = () => {
       </div>
 
       <section className="settings-section">
-        <h3>Поиск каналов</h3>
+        <h3>Каналы</h3>
+        <button
+          onClick={() => importChannels.mutate()}
+          disabled={importChannels.isPending}
+          className="settings-btn"
+          style={{ width: '100%', marginBottom: 12 }}
+        >
+          {importChannels.isPending ? 'Импортирую...' : 'Импортировать каналы из Telegram'}
+        </button>
         <div className="settings-search">
           <input
             type="text"
