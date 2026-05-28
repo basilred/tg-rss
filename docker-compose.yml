@@ -1,0 +1,11 @@
+services:
+  tg-rss:
+    build: .
+    image: tg-rss:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    env_file:
+      - .env
