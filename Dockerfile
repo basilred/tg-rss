@@ -18,10 +18,4 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data
 EXPOSE 3000
-
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
-USER root
-ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["bun", "run", "src/server/index.ts"]
