@@ -39,7 +39,7 @@ app.get('*', serveStatic({ root: './dist/web' }));
 app.get('*', serveStatic({ path: './dist/web/index.html' }));
 
 initDb();
-setupBot(BASE_URL);
+await setupBot(BASE_URL);
 startSyncWorker();
 startCleanupWorker();
 

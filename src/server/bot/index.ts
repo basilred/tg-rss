@@ -207,7 +207,8 @@ async function saveChannels(
   tx();
 }
 
-export const setupBot = (baseUrl: string): void => {
-  bot.api.setWebhook(`${baseUrl}/bot/webhook`);
+export const setupBot = async (baseUrl: string): Promise<void> => {
+  await bot.init();
+  await bot.api.setWebhook(`${baseUrl}/bot/webhook`);
   console.log(`Bot webhook set to ${baseUrl}/bot/webhook`);
 };
