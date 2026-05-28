@@ -14,9 +14,10 @@ COPY src/server ./src/server
 COPY tsconfig.json ./tsconfig.json
 COPY src/server/tsconfig.json ./src/server/tsconfig.json
 
+RUN mkdir -p /data && chmod 777 /data
+
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data
 EXPOSE 3000
-VOLUME ["/data"]
 CMD ["bun", "run", "src/server/index.ts"]
