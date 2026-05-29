@@ -176,7 +176,22 @@ bot.on('message:text', async (ctx) => {
       pendingClients.delete(userId);
       loginStates.delete(userId);
     } catch (err) {
+      const error = err as { error_code?: number; error_message?: string };
       console.error(`User ${userId}: signIn error`, JSON.stringify(err, null, 2));
+
+      if (error.error_message === 'PHONE_CODE_EXPIRED') {
+        try {
+          const mtproto = createNewClient(`${userId}-retry`);
+          const { phone_code_hash } = await sendCode(mtproto, state.phone);
+          state.phoneCodeHash = phone_code_hash;
+          pendingClients.set(userId, mtproto);
+          await ctx.reply('Код истёк. Новый код отправлен в Telegram. Введи его:');
+          return;
+        } catch {
+          // fall through to error message
+        }
+      }
+
       loginStates.delete(userId);
       pendingClients.delete(userId);
       await ctx.reply('Неверный код или ошибка входа. Отправь /login чтобы попробовать снова.');
