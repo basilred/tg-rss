@@ -26,18 +26,18 @@ const createMockElement = () => {
 
 beforeAll(() => {
   globalThis.window = {
-    confirm: (_message: string) => true,
-    alert: (_message: string) => {},
+    confirm: () => true,
+    alert: () => {},
     innerHeight: 768,
-  } as any;
+  } as unknown as Window;
   globalThis.document = {
-    createElement: (_tag: string) => createMockElement(),
-  } as any;
+    createElement: () => createMockElement(),
+  } as unknown as Document;
 });
 
 afterAll(() => {
-  delete (globalThis as any).window;
-  delete (globalThis as any).document;
+  delete (globalThis as Record<string, unknown>).window;
+  delete (globalThis as Record<string, unknown>).document;
 });
 
 test('getThemeCssVars maps Telegram theme params to CSS variables', () => {
@@ -156,6 +156,10 @@ test('disableClosingConfirmation calls SDK method', () => {
   const webApp = { disableClosingConfirmation: () => { called = true; } };
   disableClosingConfirmation(webApp);
   expect(called).toBe(true);
+});
+
+test('disableClosingConfirmation is safe no-op when undefined', () => {
+  disableClosingConfirmation(undefined);
 });
 
 test('getViewportHeight falls back to window.innerHeight', () => {
