@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useFeed } from '../hooks/useFeed';
 import { MessageCard } from './MessageCard';
+import { useHaptics } from '../hooks/useHaptics';
 
 export const FeedScreen = () => {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useFeed();
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const haptics = useHaptics();
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -13,6 +15,7 @@ export const FeedScreen = () => {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          haptics.light();
           fetchNextPage();
         }
       },
@@ -21,7 +24,7 @@ export const FeedScreen = () => {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, haptics]);
 
   if (isLoading) {
     return <div className="feed-empty">Загрузка...</div>;
