@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useUiStore } from '../stores/ui';
+import { useToast } from './ToastProvider';
+import { useTelegramPopup } from '../hooks/useTelegramPopup';
+import { useBackButton } from '../hooks/useBackButton';
+import {
+  getTelegramWebApp,
+  enableClosingConfirmation,
+  disableClosingConfirmation,
+  openTelegramLink,
+} from '../telegram/webApp';
 
 interface Props {
   telegramSyncConnected: boolean;
@@ -10,6 +19,8 @@ interface Props {
 export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const popup = useTelegramPopup();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<
     Array<{ id: number; username: string; title: string; photo_url: string }>
@@ -34,6 +45,13 @@ export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
 
   const isTelegramSyncConnected = syncStatus.telegramSyncConnected;
 
+  const handleClose = useCallback(() => {
+    disableClosingConfirmation(getTelegramWebApp());
+    setSettingsOpen(false);
+  }, [setSettingsOpen]);
+
+  useBackButton(handleClose, true);
+
   const addSub = useMutation({
     mutationFn: (channelId: number) => api.subscriptions.add(channelId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }),
@@ -52,12 +70,32 @@ export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['folders'] });
       setNewFolderName('');
+      toast.show('Папка создана', 'success');
     },
   });
 
   const deleteFolder = useMutation({
-    mutationFn: (id: number) => api.folders.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['folders'] }),
+    mutationFn: async (id: number) => {
+      const confirmed = await popup.confirm({
+        title: 'Удалить папку?',
+        message: 'Все каналы в этой папке будут откреплены.',
+        buttons: [
+          { id: 'delete', type: 'destructive', text: 'Удалить' },
+          { id: 'cancel', type: 'cancel', text: 'Отмена' },
+        ],
+      });
+      if (confirmed !== 'delete') throw new Error('Cancelled');
+      return api.folders.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['folders'] });
+      toast.show('Папка удалена', 'neutral');
+    },
+    onError: (err) => {
+      if (err.message !== 'Cancelled') {
+        toast.show('Ошибка при удалении папки', 'error');
+      }
+    },
   });
 
   const importChannels = useMutation({
@@ -65,9 +103,9 @@ export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      alert(`Импортировано ${data.imported} каналов`);
+      toast.show(`Импортировано ${data.imported} каналов`, 'success');
     },
-    onError: () => alert('Ошибка импорта. Убедись, что подключился.'),
+    onError: () => toast.show('Ошибка импорта. Убедись, что подключился.', 'error'),
   });
 
   const handleSearch = async () => {
@@ -76,25 +114,51 @@ export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
     setSearchResults(results);
   };
 
+  const handleDeepLink = () => {
+    const webApp = getTelegramWebApp();
+    const username = syncStatus.botUsername;
+    if (username) {
+      openTelegramLink(webApp, `https://t.me/${username}?start=login`);
+    } else {
+      openTelegramLink(webApp, `https://t.me/?start=login`);
+    }
+  };
+
+  useEffect(() => {
+    if (newFolderName.trim()) {
+      enableClosingConfirmation(getTelegramWebApp());
+    } else {
+      disableClosingConfirmation(getTelegramWebApp());
+    }
+  }, [newFolderName]);
+
   return (
     <main className="settings">
       <div className="settings-header">
         <h2>Настройки</h2>
-        <button className="settings-close" onClick={() => setSettingsOpen(false)}>✕</button>
+        <button className="settings-close" onClick={handleClose}>✕</button>
       </div>
 
       <section className="settings-section">
         <h3>Каналы</h3>
         {!isTelegramSyncConnected && (
-          <p className="settings-hint">
-            Для автоматического импорта твоих Telegram-подписок подключи Telegram sync через /login в боте.
-          </p>
+          <details className="settings-hint-details">
+            <summary className="settings-hint-summary">
+              Telegram sync не подключён
+            </summary>
+            <p className="settings-hint">
+              Для автоматического импорта подписок подключи синхронизацию.
+            </p>
+            <button className="settings-btn" onClick={handleDeepLink}>
+              Подключить синхронизацию
+            </button>
+          </details>
         )}
         <button
           onClick={() => importChannels.mutate()}
           disabled={importChannels.isPending || !isTelegramSyncConnected}
           className="settings-btn"
-          style={{ width: '100%', marginBottom: 12 }}
+          style={{ width: '100%', marginBottom: 12, marginTop: isTelegramSyncConnected ? 0 : 12 }}
         >
           {importChannels.isPending ? 'Импортирую...' : 'Импортировать каналы из Telegram'}
         </button>
