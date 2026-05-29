@@ -55,7 +55,10 @@ interface ExportLoginTokenResult {
   tgLoginUrl: string;
 }
 
-export const exportLoginToken = async (): Promise<ExportLoginTokenResult> => {
+export const exportLoginToken = async (): Promise<{
+  result: ExportLoginTokenResult;
+  client: MTProtoClient;
+}> => {
   const dataDir = process.env.DATA_DIR || '/data';
   const client = new MTProto({
     api_id: API_ID,
@@ -75,7 +78,10 @@ export const exportLoginToken = async (): Promise<ExportLoginTokenResult> => {
   const tokenBase64 = Buffer.from(result.token).toString('base64url');
   const tgLoginUrl = `tg://login?token=${tokenBase64}`;
 
-  return { token: result.token, expires: result.expires, tgLoginUrl };
+  return {
+    result: { token: result.token, expires: result.expires, tgLoginUrl },
+    client,
+  };
 };
 
 interface ImportLoginTokenResult {
@@ -83,22 +89,16 @@ interface ImportLoginTokenResult {
 }
 
 export const importLoginToken = async (
+  client: MTProtoClient,
   token: Uint8Array,
+  userId: number,
 ): Promise<ImportLoginTokenResult> => {
-  const dataDir = process.env.DATA_DIR || '/data';
-  const client = new MTProto({
-    api_id: API_ID,
-    api_hash: API_HASH,
-    storageOptions: { path: `${dataDir}/mtproto-qr-${Date.now()}-import` },
-  });
-
   const result = await client.call('auth.importLoginToken', {
     token,
   }) as {
     user: { id: number; first_name?: string; last_name?: string };
   };
 
-  // Save the session
   const dc = client.storage.get('dc');
   const authKey = client.storage.get('auth_key');
   const serverSalt = client.storage.get('server_salt');
@@ -109,7 +109,7 @@ export const importLoginToken = async (
   const db = getDb();
   db.run(
     'INSERT OR REPLACE INTO user_sessions (user_id, encrypted_session_data, is_active) VALUES (?, ?, 1)',
-    [result.user.id, encrypted],
+    [userId, encrypted],
   );
 
   return result;

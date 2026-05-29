@@ -38,8 +38,9 @@ auth.post('/verify', async (c) => {
   return c.json({ token });
 });
 
-// Store pending login tokens in memory
-const pendingTokens = new Map<string, Uint8Array>();
+// Store pending login sessions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const pendingLogins = new Map<string, { client: any; token: Uint8Array }>();
 
 auth.post('/export-login-token', async (c) => {
   const { initData } = await c.req.json<{ initData: string }>();
@@ -48,13 +49,16 @@ auth.post('/export-login-token', async (c) => {
   const user = verifyInitData(initData, BOT_TOKEN);
   if (!user) return c.json({ error: 'Invalid initData' }, 401);
 
+  console.log(`[exportLoginToken] user=${user.id}, starting...`);
   try {
-    const result = await exportLoginToken();
+    const { result, client } = await exportLoginToken();
+    console.log(`[exportLoginToken] user=${user.id}, success, tgUrl=${result.tgLoginUrl.substring(0, 40)}...`);
+
     const tokenKey = Buffer.from(result.token).toString('base64url');
-    pendingTokens.set(tokenKey, result.token);
+    pendingLogins.set(tokenKey, { client, token: result.token });
 
     // Auto-expire after 5 minutes
-    setTimeout(() => pendingTokens.delete(tokenKey), 300_000);
+    setTimeout(() => pendingLogins.delete(tokenKey), 300_000);
 
     return c.json({
       tgLoginUrl: result.tgLoginUrl,
@@ -62,35 +66,45 @@ auth.post('/export-login-token', async (c) => {
       expires: result.expires,
     });
   } catch (err) {
-    console.error('exportLoginToken error:', err);
-    return c.json({ error: 'Failed to generate login token' }, 500);
+    console.error(`[exportLoginToken] user=${user.id} error:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    return c.json({ error: 'Failed to generate login token', detail: String(err) }, 500);
   }
 });
 
 auth.post('/import-login-token', async (c) => {
   const { tokenKey, initData } = await c.req.json<{ tokenKey: string; initData: string }>();
-  if (!initData) return c.json({ error: 'Missing initData' }, 400);
+  if (!initData || !tokenKey) return c.json({ error: 'Missing data' }, 400);
 
   const user = verifyInitData(initData, BOT_TOKEN);
   if (!user) return c.json({ error: 'Invalid initData' }, 401);
 
-  const token = pendingTokens.get(tokenKey);
-  if (!token) {
-    return c.json({ error: 'Token expired or not found' }, 404);
+  const pending = pendingLogins.get(tokenKey);
+  if (!pending) return c.json({ error: 'Token expired or not found' }, 404);
+
+  // Poll on server side for up to 60 seconds
+  for (let i = 0; i < 30; i++) {
+    try {
+      const result = await importLoginToken(pending.client, pending.token, user.id);
+      pendingLogins.delete(tokenKey);
+
+      const db = getDb();
+      db.run('INSERT OR IGNORE INTO users (id) VALUES (?)', [user.id]);
+
+      return c.json({ ok: true, userId: result.user.id });
+    } catch (err: unknown) {
+      const mtError = err as { error_message?: string };
+      if (mtError.error_message === 'AUTH_TOKEN_EXPIRED' || mtError.error_message === 'AUTH_TOKEN_INVALID') {
+        pendingLogins.delete(tokenKey);
+        return c.json({ error: 'Token expired. Try again.' }, 400);
+      }
+      // Token not yet accepted, keep polling
+      console.log(`[importLoginToken] user=${user.id}, waiting... (${i})`);
+    }
+    await new Promise((r) => setTimeout(r, 2000));
   }
 
-  try {
-    const result = await importLoginToken(token);
-    pendingTokens.delete(tokenKey);
-
-    const db = getDb();
-    db.run('INSERT OR IGNORE INTO users (id) VALUES (?)', [result.user.id]);
-
-    return c.json({ ok: true, userId: result.user.id });
-  } catch (err) {
-    console.error('importLoginToken error:', err);
-    return c.json({ error: 'Login not accepted yet or failed' }, 400);
-  }
+  pendingLogins.delete(tokenKey);
+  return c.json({ error: 'Login not accepted. Please confirm in Telegram.' }, 400);
 });
 
 auth.post('/import-channels', async (c) => {

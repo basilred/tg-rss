@@ -40,6 +40,7 @@ const App = () => {
 
     try {
       const initData = initDataRef.current;
+
       // 1. Get login token
       const { tgLoginUrl, tokenKey } = await api.auth.exportLoginToken(initData);
 
@@ -50,40 +51,42 @@ const App = () => {
         window.open(tgLoginUrl, '_blank');
       }
 
-      // 3. Poll for login completion
-      for (let i = 0; i < 30; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        try {
-          const result = await api.auth.importLoginToken(tokenKey, initData);
-          if (result.ok) {
-            // 4. Import channels
-            try {
-              await api.auth.importChannels(initData);
-            } catch {
-              // channels will sync via worker
-            }
-            // 5. Reload to get fresh JWT
+      // 3. Wait for server to confirm login (server polls internally)
+      try {
+        const result = await api.auth.importLoginToken(tokenKey, initData);
+        if (result.ok) {
+          // 4. Import channels
+          try {
+            await api.auth.importChannels(initData);
+          } catch {
+            // channels will sync via worker
+          }
+          // 5. Re-verify to get JWT
+          const verifyRes = await api.auth.verify(initData);
+          if (verifyRes.token) {
+            setToken(verifyRes.token);
+            setIsAuthed(true);
             setNeedsSession(false);
             setConnecting(false);
-            // Re-verify to get new token
-            const initData = window.Telegram?.WebApp?.initData;
-            if (initData) {
-              const verifyRes = await api.auth.verify(initData);
-              if (verifyRes.token) {
-                setToken(verifyRes.token);
-                setIsAuthed(true);
-                return;
-              }
-            }
-            setIsAuthed(true);
             return;
           }
-        } catch {
-          // not accepted yet, keep polling
+          setIsAuthed(true);
+          setNeedsSession(false);
+          setConnecting(false);
+          return;
         }
+      } catch (pollErr: unknown) {
+        const err = pollErr as Error;
+        if (err.message.includes('Token expired')) {
+          setConnectError('Время подтверждения истекло. Попробуй ещё раз.');
+        } else {
+          setConnectError('Не удалось подтвердить вход. Попробуй ещё раз.');
+        }
+        setConnecting(false);
+        return;
       }
 
-      setConnectError('Время ожидания истекло. Попробуй ещё раз.');
+      setConnectError('Не удалось подключиться. Попробуй ещё раз.');
     } catch (err) {
       console.error('Connect error:', err);
       setConnectError('Ошибка подключения. Попробуй ещё раз.');
