@@ -26,10 +26,14 @@ auth.post('/verify', async (c) => {
     .query('SELECT is_active FROM user_sessions WHERE user_id = ?')
     .get(user.id) as { is_active: number } | undefined;
 
+  console.log(`[verify] user=${user.id}, session=${JSON.stringify(session)}`);
+
   if (!session || !session.is_active) {
+    console.log(`[verify] user=${user.id}: needsSession`);
     return c.json({ needsSession: true });
   }
 
+  console.log(`[verify] user=${user.id}: returning token`);
   const token = createJwt(user.id);
   return c.json({ token });
 });
