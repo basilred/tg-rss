@@ -62,9 +62,17 @@ folders.delete('/:id', (c) => {
 });
 
 folders.post('/:id/channels', async (c) => {
+  const userId = c.get('userId');
   const folderId = Number(c.req.param('id'));
   const { channelId } = await c.req.json<{ channelId: number }>();
   const db = getDb();
+
+  const folder = db
+    .query('SELECT id FROM folders WHERE id = ? AND user_id = ?')
+    .get(folderId, userId);
+  if (!folder) {
+    return c.json({ error: 'Folder not found' }, 404);
+  }
 
   db.run(
     'INSERT OR REPLACE INTO folder_channels (folder_id, channel_id) VALUES (?, ?)',
@@ -75,9 +83,17 @@ folders.post('/:id/channels', async (c) => {
 });
 
 folders.delete('/:id/channels/:channelId', (c) => {
+  const userId = c.get('userId');
   const folderId = Number(c.req.param('id'));
   const channelId = Number(c.req.param('channelId'));
   const db = getDb();
+
+  const folder = db
+    .query('SELECT id FROM folders WHERE id = ? AND user_id = ?')
+    .get(folderId, userId);
+  if (!folder) {
+    return c.json({ error: 'Folder not found' }, 404);
+  }
 
   db.run('DELETE FROM folder_channels WHERE folder_id = ? AND channel_id = ?', [
     folderId,

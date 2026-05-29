@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { setToken, api } from './api/client';
 import { useUiStore } from './stores/ui';
 import { FeedScreen } from './components/FeedScreen';
@@ -9,39 +9,35 @@ import { BottomBar } from './components/BottomBar';
 
 const App = () => {
   const [isAuthed, setIsAuthed] = useState(false);
-  const [needsSession, setNeedsSession] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [telegramSyncConnected, setTelegramSyncConnected] = useState(false);
   const isSettingsOpen = useUiStore((s) => s.isSettingsOpen);
-  const initDataRef = useRef('');
 
   useEffect(() => {
-    const initData = window.Telegram?.WebApp?.initData;
-    initDataRef.current = initData || '';
+    const webApp = window.Telegram?.WebApp;
+    webApp?.ready();
+    webApp?.expand();
+
+    const initData = webApp?.initData;
     if (!initData) {
-      setToken('dev-token');
-      setIsAuthed(true);
+      setAuthError('Открой приложение внутри Telegram.');
       return;
     }
 
-    api.auth.verify(initData).then((res) => {
-      if (res.token) {
+    api.auth.verify(initData)
+      .then((res) => {
         setToken(res.token);
+        setTelegramSyncConnected(res.telegramSyncConnected);
         setIsAuthed(true);
-      } else if (res.needsSession) {
-        setNeedsSession(true);
-      }
-    });
+      })
+      .catch(() => setAuthError('Не удалось войти через Telegram.'));
   }, []);
 
-  if (needsSession) {
+  if (authError) {
     return (
       <div className="app-empty">
         <h2 style={{ marginBottom: 12 }}>tg-rss</h2>
-        <p style={{ marginBottom: 16 }}>
-          Чтобы читать каналы, нужно один раз подключиться.
-        </p>
-        <p style={{ color: 'var(--tg-theme-hint-color)', fontSize: 14 }}>
-          Отправь <b>/login</b> боту в чате.
-        </p>
+        <p style={{ marginBottom: 16 }}>{authError}</p>
       </div>
     );
   }
@@ -54,7 +50,11 @@ const App = () => {
     <div className="app">
       <Header />
       <FolderTabs />
-      {isSettingsOpen ? <SettingsScreen /> : <FeedScreen />}
+      {isSettingsOpen ? (
+        <SettingsScreen telegramSyncConnected={telegramSyncConnected} />
+      ) : (
+        <FeedScreen />
+      )}
       <BottomBar />
     </div>
   );

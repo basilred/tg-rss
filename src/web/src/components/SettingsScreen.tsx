@@ -3,7 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useUiStore } from '../stores/ui';
 
-export const SettingsScreen = () => {
+interface Props {
+  telegramSyncConnected: boolean;
+}
+
+export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,7 +53,7 @@ export const SettingsScreen = () => {
   });
 
   const importChannels = useMutation({
-    mutationFn: () => api.auth.importChannels(),
+    mutationFn: () => api.subscriptions.import(),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
@@ -73,9 +77,14 @@ export const SettingsScreen = () => {
 
       <section className="settings-section">
         <h3>Каналы</h3>
+        {!telegramSyncConnected && (
+          <p className="settings-hint">
+            Для автоматического импорта твоих Telegram-подписок подключи Telegram sync через /login в боте.
+          </p>
+        )}
         <button
           onClick={() => importChannels.mutate()}
-          disabled={importChannels.isPending}
+          disabled={importChannels.isPending || !telegramSyncConnected}
           className="settings-btn"
           style={{ width: '100%', marginBottom: 12 }}
         >

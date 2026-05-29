@@ -31,7 +31,16 @@ const request = async <T>(
 export const api = {
   auth: {
     verify: (initData: string) =>
-      request<{ token?: string; needsSession?: boolean }>('/auth/verify', {
+      request<{
+        token: string;
+        telegramSyncConnected: boolean;
+        user: {
+          id: number;
+          firstName?: string;
+          lastName?: string;
+          username?: string;
+        };
+      }>('/auth/verify', {
         method: 'POST',
         body: JSON.stringify({ initData }),
       }),

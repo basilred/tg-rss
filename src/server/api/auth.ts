@@ -25,12 +25,17 @@ auth.post('/verify', async (c) => {
     .query('SELECT is_active FROM user_sessions WHERE user_id = ?')
     .get(user.id) as { is_active: number } | undefined;
 
-  if (!session || !session.is_active) {
-    return c.json({ needsSession: true });
-  }
-
   const token = createJwt(user.id);
-  return c.json({ token });
+  return c.json({
+    token,
+    telegramSyncConnected: session?.is_active === 1,
+    user: {
+      id: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      username: user.username,
+    },
+  });
 });
 
 auth.post('/import-channels', async (c) => {

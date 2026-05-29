@@ -2,7 +2,6 @@ import { getDb } from '../db';
 import { getClient } from '../mtproto';
 
 const ACTIVE_INTERVAL = 30_000;
-const INACTIVE_INTERVAL = 300_000;
 
 let isRunning = false;
 
