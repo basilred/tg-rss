@@ -52,22 +52,63 @@ auth.post('/export-login-token', async (c) => {
   console.log(`[exportLoginToken] user=${user.id}, starting...`);
   try {
     const { result, client } = await exportLoginToken();
-    console.log(`[exportLoginToken] user=${user.id}, success, tgUrl=${result.tgLoginUrl.substring(0, 40)}...`);
+    console.log(`[exportLoginToken] user=${user.id}, success`);
 
     const tokenKey = Buffer.from(result.token).toString('base64url');
-    pendingLogins.set(tokenKey, { client, token: result.token });
+    const token = result.token;
+    const userId = user.id;
 
-    // Auto-expire after 5 minutes
-    setTimeout(() => pendingLogins.delete(tokenKey), 300_000);
+    // Start background polling — don't await
+    const db = getDb();
+    db.run('INSERT OR IGNORE INTO users (id) VALUES (?)', [userId]);
 
-    return c.json({
-      tgLoginUrl: result.tgLoginUrl,
-      tokenKey,
-      expires: result.expires,
-    });
+    const bgPoll = async () => {
+      for (let i = 0; i < 60; i++) {
+        try {
+          const loginResult = await importLoginToken(client, token, userId);
+          console.log(`[bgPoll] user=${userId}: login complete, importing channels...`);
+
+          // Import channels
+          try {
+            const dialogs = await getDialogs(client);
+            const insertChannel = db.prepare(
+              'INSERT OR REPLACE INTO channels (id, username, title, photo_url) VALUES (?, ?, ?, ?)',
+            );
+            const insertSub = db.prepare(
+              'INSERT OR IGNORE INTO subscriptions (user_id, channel_id) VALUES (?, ?)',
+            );
+            const tx = db.transaction(() => {
+              for (const ch of dialogs) {
+                insertChannel.run(ch.id, ch.username, ch.title, ch.photoUrl);
+                insertSub.run(userId, ch.id);
+              }
+            });
+            tx();
+            console.log(`[bgPoll] user=${userId}: imported ${dialogs.length} channels`);
+          } catch (err) {
+            console.error(`[bgPoll] user=${userId}: channel import failed`, err);
+          }
+
+          console.log(`[bgPoll] user=${userId}: all done, user_id=${loginResult.user.id}`);
+          return;
+        } catch (err: unknown) {
+          const mtError = err as { error_message?: string };
+          if (mtError.error_message === 'AUTH_TOKEN_EXPIRED' || mtError.error_message === 'AUTH_TOKEN_INVALID') {
+            console.warn(`[bgPoll] user=${userId}: token expired`);
+            return;
+          }
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      console.warn(`[bgPoll] user=${userId}: timed out`);
+    };
+
+    bgPoll(); // fire and forget
+
+    return c.json({ tgLoginUrl: result.tgLoginUrl, expires: result.expires });
   } catch (err) {
-    console.error(`[exportLoginToken] user=${user.id} error:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
-    return c.json({ error: 'Failed to generate login token', detail: String(err) }, 500);
+    console.error(`[exportLoginToken] user=${user.id} error:`, err);
+    return c.json({ error: 'Failed to generate login token' }, 500);
   }
 });
 

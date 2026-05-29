@@ -41,57 +41,23 @@ const App = () => {
     try {
       const initData = initDataRef.current;
 
-      // 1. Get login token
-      const { tgLoginUrl, tokenKey } = await api.auth.exportLoginToken(initData);
+      // Get login token
+      const { tgLoginUrl } = await api.auth.exportLoginToken(initData);
 
-      // 2. Open Telegram login link
+      // Open login link in Telegram (this will background the Mini App)
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.openTelegramLink(tgLoginUrl);
-      } else {
-        window.open(tgLoginUrl, '_blank');
       }
 
-      // 3. Wait for server to confirm login (server polls internally)
-      try {
-        const result = await api.auth.importLoginToken(tokenKey, initData);
-        if (result.ok) {
-          // 4. Import channels
-          try {
-            await api.auth.importChannels(initData);
-          } catch {
-            // channels will sync via worker
-          }
-          // 5. Re-verify to get JWT
-          const verifyRes = await api.auth.verify(initData);
-          if (verifyRes.token) {
-            setToken(verifyRes.token);
-            setIsAuthed(true);
-            setNeedsSession(false);
-            setConnecting(false);
-            return;
-          }
-          setIsAuthed(true);
-          setNeedsSession(false);
-          setConnecting(false);
-          return;
-        }
-      } catch (pollErr: unknown) {
-        const err = pollErr as Error;
-        if (err.message.includes('Token expired')) {
-          setConnectError('Время подтверждения истекло. Попробуй ещё раз.');
-        } else {
-          setConnectError('Не удалось подтвердить вход. Попробуй ещё раз.');
-        }
-        setConnecting(false);
-        return;
-      }
-
-      setConnectError('Не удалось подключиться. Попробуй ещё раз.');
+      // Show hint — user needs to confirm and reopen
+      setConnectError(
+        'Нажми «Разрешить» в открывшемся окне Telegram, затем вернись в ленту.',
+      );
     } catch (err) {
       console.error('Connect error:', err);
       setConnectError('Ошибка подключения. Попробуй ещё раз.');
+      setConnecting(false);
     }
-    setConnecting(false);
   }, []);
 
   if (needsSession) {
@@ -101,17 +67,18 @@ const App = () => {
         <p style={{ marginBottom: 16 }}>
           Чтобы читать каналы, нужно один раз подключиться.
         </p>
-        <button
-          onClick={handleConnect}
-          disabled={connecting}
-          className="settings-btn"
-          style={{ fontSize: 16, padding: '12px 24px' }}
-        >
-          {connecting ? 'Ожидание подтверждения...' : 'Подключиться'}
-        </button>
+        {!connecting && (
+          <button
+            onClick={handleConnect}
+            className="settings-btn"
+            style={{ fontSize: 16, padding: '12px 24px' }}
+          >
+            Подключиться
+          </button>
+        )}
         {connecting && (
           <p style={{ marginTop: 12, color: 'var(--tg-theme-hint-color)', fontSize: 14 }}>
-            Нажми «Разрешить» в открывшемся окне Telegram
+            Нажми «Разрешить» в Telegram, затем вернись в ленту
           </p>
         )}
         {connectError && (
