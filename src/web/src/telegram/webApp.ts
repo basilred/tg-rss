@@ -1,4 +1,4 @@
-import type { TelegramWebAppApi } from './types';
+import type { HapticImpactStyle, HapticNotificationType, TelegramPopupParams, TelegramWebAppApi } from './types';
 
 type ThemeParams = Record<string, string | undefined>;
 
@@ -11,6 +11,9 @@ interface BackButtonApi {
 
 interface TelegramWebAppLike {
   BackButton?: BackButtonApi;
+  enableClosingConfirmation?: () => void;
+  disableClosingConfirmation?: () => void;
+  openTelegramLink?: (url: string) => void;
 }
 
 const THEME_PARAM_TO_CSS_VAR: Record<string, string> = {
@@ -74,4 +77,96 @@ export const configureBackButton = (
       backButton.hide();
     }
   };
+};
+
+// --- Popup helpers ---
+
+export const showTelegramPopup = (
+  webApp: { showPopup?: (params: TelegramPopupParams, cb?: (buttonId?: string) => void) => void } | undefined,
+  params: TelegramPopupParams,
+): Promise<string | undefined> => {
+  if (!webApp?.showPopup) {
+    const confirmed = window.confirm(params.message);
+    return Promise.resolve(confirmed ? (params.buttons?.[0]?.id ?? 'ok') : 'cancel');
+  }
+
+  return new Promise((resolve) => {
+    webApp.showPopup!(params, (buttonId) => {
+      resolve(buttonId);
+    });
+  });
+};
+
+export const showTelegramAlert = (
+  webApp: { showAlert?: (message: string, cb?: () => void) => void } | undefined,
+  message: string,
+): Promise<void> => {
+  if (!webApp?.showAlert) {
+    window.alert(message);
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    webApp.showAlert!(message, () => resolve());
+  });
+};
+
+// --- Closing confirmation ---
+
+export const enableClosingConfirmation = (
+  webApp: { enableClosingConfirmation?: () => void } | undefined,
+): void => {
+  webApp?.enableClosingConfirmation?.();
+};
+
+export const disableClosingConfirmation = (
+  webApp: { disableClosingConfirmation?: () => void } | undefined,
+): void => {
+  webApp?.disableClosingConfirmation?.();
+};
+
+// --- Haptic feedback ---
+
+export const hapticImpact = (
+  webApp: { HapticFeedback?: { impactOccurred: (style: HapticImpactStyle) => void } } | undefined,
+  style: HapticImpactStyle,
+): void => {
+  webApp?.HapticFeedback?.impactOccurred(style);
+};
+
+export const hapticNotification = (
+  webApp: { HapticFeedback?: { notificationOccurred: (type: HapticNotificationType) => void } } | undefined,
+  type: HapticNotificationType,
+): void => {
+  webApp?.HapticFeedback?.notificationOccurred(type);
+};
+
+export const hapticSelection = (
+  webApp: { HapticFeedback?: { selectionChanged: () => void } } | undefined,
+): void => {
+  webApp?.HapticFeedback?.selectionChanged();
+};
+
+// --- Viewport ---
+
+export const getViewportHeight = (
+  webApp: { viewportHeight?: number } | undefined,
+): number => {
+  return webApp?.viewportHeight ?? window.innerHeight;
+};
+
+export const applyViewportHeight = (
+  webApp: { viewportHeight?: number } | undefined,
+  root = document.documentElement,
+): void => {
+  root.style.setProperty('--tg-viewport-height', `${getViewportHeight(webApp)}px`);
+};
+
+// --- Deep link ---
+
+export const openTelegramLink = (
+  webApp: TelegramWebAppLike | undefined,
+  url: string,
+): void => {
+  webApp?.openTelegramLink?.(url);
 };
