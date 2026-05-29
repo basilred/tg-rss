@@ -45,7 +45,7 @@ export const api = {
         body: JSON.stringify({ initData }),
       }),
     status: () =>
-      request<{ telegramSyncConnected: boolean }>('/auth/status'),
+      request<{ telegramSyncConnected: boolean; botUsername: string | null }>('/auth/status'),
   },
   channels: {
     search: (q: string) =>

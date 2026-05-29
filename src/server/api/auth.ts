@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { verifyInitData, createJwt } from '../auth';
 import { getDb } from '../db';
 import { authMiddleware } from '../middleware/auth';
+import { bot } from '../bot';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 
@@ -45,7 +46,10 @@ auth.get('/status', authMiddleware, (c) => {
     .query('SELECT is_active FROM user_sessions WHERE user_id = ?')
     .get(userId) as { is_active: number } | undefined;
 
-  return c.json({ telegramSyncConnected: session?.is_active === 1 });
+  return c.json({
+    telegramSyncConnected: session?.is_active === 1,
+    botUsername: bot.botInfo?.username ?? null,
+  });
 });
 
 export { auth };

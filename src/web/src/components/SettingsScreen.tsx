@@ -29,7 +29,7 @@ export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
   const { data: syncStatus } = useQuery({
     queryKey: ['auth', 'status'],
     queryFn: () => api.auth.status(),
-    initialData: { telegramSyncConnected },
+    initialData: { telegramSyncConnected, botUsername: null },
   });
 
   const isTelegramSyncConnected = syncStatus.telegramSyncConnected;
