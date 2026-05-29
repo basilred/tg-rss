@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { setToken, api } from './api/client';
 import { useUiStore } from './stores/ui';
+import { useTelegram } from './hooks/useTelegram';
 import { FeedScreen } from './components/FeedScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { Header } from './components/Header';
@@ -8,17 +9,14 @@ import { FolderTabs } from './components/FolderTabs';
 import { BottomBar } from './components/BottomBar';
 
 const App = () => {
+  const telegram = useTelegram();
   const [isAuthed, setIsAuthed] = useState(false);
   const [authError, setAuthError] = useState('');
   const [telegramSyncConnected, setTelegramSyncConnected] = useState(false);
   const isSettingsOpen = useUiStore((s) => s.isSettingsOpen);
 
   useEffect(() => {
-    const webApp = window.Telegram?.WebApp;
-    webApp?.ready();
-    webApp?.expand();
-
-    const initData = webApp?.initData;
+    const initData = telegram.initData;
     if (!initData) {
       setAuthError('Открой приложение внутри Telegram.');
       return;
@@ -31,7 +29,7 @@ const App = () => {
         setIsAuthed(true);
       })
       .catch(() => setAuthError('Не удалось войти через Telegram.'));
-  }, []);
+  }, [telegram.initData]);
 
   if (authError) {
     return (
