@@ -151,18 +151,24 @@ bot.on('message:text', async (ctx) => {
 
 async function saveChannels(
   userId: number,
-  channels: Array<{ id: number; username: string; title: string; photoUrl: string | null }>,
+  channels: Array<{
+    id: number;
+    accessHash: string;
+    username: string;
+    title: string;
+    photoUrl: string | null;
+  }>,
 ): Promise<void> {
   const db = getDb();
   const insertChannel = db.prepare(
-    'INSERT OR REPLACE INTO channels (id, username, title, photo_url) VALUES (?, ?, ?, ?)',
+    'INSERT OR REPLACE INTO channels (id, access_hash, username, title, photo_url) VALUES (?, ?, ?, ?, ?)',
   );
   const insertSub = db.prepare(
     'INSERT OR IGNORE INTO subscriptions (user_id, channel_id) VALUES (?, ?)',
   );
   const tx = db.transaction(() => {
     for (const ch of channels) {
-      insertChannel.run(ch.id, ch.username, ch.title, ch.photoUrl);
+      insertChannel.run(ch.id, ch.accessHash, ch.username, ch.title, ch.photoUrl);
       insertSub.run(userId, ch.id);
     }
   });

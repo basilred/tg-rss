@@ -10,22 +10,29 @@ const syncUser = async (userId: number): Promise<void> => {
 
   const subs = db
     .query(
-      `SELECT channel_id FROM subscriptions
-       WHERE user_id = ? AND is_active = 1`,
+      `SELECT s.channel_id, c.access_hash
+       FROM subscriptions s
+       JOIN channels c ON c.id = s.channel_id
+       WHERE s.user_id = ? AND s.is_active = 1`,
     )
-    .all(userId) as { channel_id: number }[];
+    .all(userId) as { channel_id: number; access_hash: string | null }[];
 
   if (subs.length === 0) return;
 
   const client = getClient(userId);
 
-  for (const { channel_id } of subs) {
+  for (const { channel_id, access_hash } of subs) {
+    if (!access_hash) {
+      console.warn(`User ${userId}, channel ${channel_id}: missing access_hash`);
+      continue;
+    }
+
     try {
       const result = await client.call('messages.getHistory', {
         peer: {
           _: 'inputPeerChannel',
           channel_id: Math.abs(channel_id),
-          access_hash: 0,
+          access_hash,
         },
         offset_id: 0,
         limit: 20,

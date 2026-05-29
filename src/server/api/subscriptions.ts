@@ -55,7 +55,7 @@ subscriptions.post('/import', async (c) => {
     const channels = await getDialogs(client);
 
     const insertChannel = db.prepare(
-      'INSERT OR REPLACE INTO channels (id, username, title, photo_url) VALUES (?, ?, ?, ?)',
+      'INSERT OR REPLACE INTO channels (id, access_hash, username, title, photo_url) VALUES (?, ?, ?, ?, ?)',
     );
     const insertSub = db.prepare(
       'INSERT OR IGNORE INTO subscriptions (user_id, channel_id) VALUES (?, ?)',
@@ -63,7 +63,7 @@ subscriptions.post('/import', async (c) => {
 
     const tx = db.transaction(() => {
       for (const ch of channels) {
-        insertChannel.run(ch.id, ch.username, ch.title, ch.photoUrl);
+        insertChannel.run(ch.id, ch.accessHash, ch.username, ch.title, ch.photoUrl);
         insertSub.run(userId, ch.id);
       }
     });

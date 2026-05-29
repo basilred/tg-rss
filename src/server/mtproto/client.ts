@@ -100,6 +100,7 @@ export const signIn = async (
 
 interface ChannelInfo {
   id: number;
+  accessHash: string;
   username: string;
   title: string;
   photoUrl: string | null;
@@ -118,6 +119,7 @@ export const getDialogs = async (
     chats: Array<{
       _: string;
       id: number;
+      access_hash?: string | number;
       username?: string;
       title: string;
       photo?: { dc_id: number; id: number; access_hash: number };
@@ -129,6 +131,7 @@ export const getDialogs = async (
     if (chat._ === 'channel') {
       channels.push({
         id: -Math.abs(chat.id),
+        accessHash: chat.access_hash ? String(chat.access_hash) : '',
         username: chat.username || '',
         title: chat.title,
         photoUrl: chat.photo
