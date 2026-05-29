@@ -1,5 +1,6 @@
 import { getDb } from '../db';
 import { getClient } from '../mtproto';
+import { createSerializedRunner } from './runner';
 
 const ACTIVE_INTERVAL = 30_000;
 
@@ -82,7 +83,7 @@ export const startSyncWorker = (): void => {
   if (isRunning) return;
   isRunning = true;
 
-  const tick = async () => {
+  const runTick = createSerializedRunner(async () => {
     const db = getDb();
     const users = db
       .query('SELECT user_id FROM user_sessions WHERE is_active = 1')
@@ -91,9 +92,9 @@ export const startSyncWorker = (): void => {
     for (const { user_id } of users) {
       await syncUser(user_id);
     }
-  };
+  });
 
-  tick();
-  setInterval(tick, ACTIVE_INTERVAL);
+  runTick();
+  setInterval(runTick, ACTIVE_INTERVAL);
   console.log('Sync worker started');
 };
