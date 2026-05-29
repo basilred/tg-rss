@@ -5,11 +5,12 @@ import { decryptSession, encryptSession } from './session';
 const API_ID = Number(process.env.API_ID) || 0;
 const API_HASH = process.env.API_HASH || '';
 
-type ClientMap = Map<number, InstanceType<typeof MTProto>>;
+type MTProtoClient = InstanceType<typeof MTProto>;
+type ClientMap = Map<number, MTProtoClient>;
 
 const clients: ClientMap = new Map();
 
-export const getClient = (userId: number): InstanceType<typeof MTProto> => {
+export const getClient = (userId: number): MTProtoClient => {
   let client = clients.get(userId);
   if (!client) {
     const db = getDb();
@@ -46,55 +47,58 @@ export const clearClient = (userId: number): void => {
   clients.delete(userId);
 };
 
-export const createNewClient = (tempId?: string): InstanceType<typeof MTProto> => {
-  const path = tempId
-    ? `${process.env.DATA_DIR || '/data'}/mtproto-temp-${tempId}`
-    : undefined;
+// ---- QR Code Login ----
 
-  return new MTProto({
+interface ExportLoginTokenResult {
+  token: Uint8Array;
+  expires: number;
+  tgLoginUrl: string;
+}
+
+export const exportLoginToken = async (): Promise<ExportLoginTokenResult> => {
+  const dataDir = process.env.DATA_DIR || '/data';
+  const client = new MTProto({
     api_id: API_ID,
     api_hash: API_HASH,
-    ...(path ? { storageOptions: { path } } : {}),
+    storageOptions: { path: `${dataDir}/mtproto-qr-${Date.now()}` },
   });
+
+  const result = await client.call('auth.exportLoginToken', {
+    api_id: API_ID,
+    api_hash: API_HASH,
+    except_ids: [],
+  }) as {
+    token: Uint8Array;
+    expires: number;
+  };
+
+  const tokenBase64 = Buffer.from(result.token).toString('base64url');
+  const tgLoginUrl = `tg://login?token=${tokenBase64}`;
+
+  return { token: result.token, expires: result.expires, tgLoginUrl };
 };
 
-interface SendCodeResult {
-  phone_code_hash: string;
+interface ImportLoginTokenResult {
+  user: { id: number; first_name?: string; last_name?: string };
 }
 
-export const sendCode = async (
-  client: InstanceType<typeof MTProto>,
-  phone: string,
-): Promise<SendCodeResult> => {
-  const result = await client.call('auth.sendCode', {
-    phone_number: phone,
-    settings: { _: 'codeSettings' },
-  }) as { phone_code_hash: string };
-  return { phone_code_hash: result.phone_code_hash };
-};
+export const importLoginToken = async (
+  token: Uint8Array,
+): Promise<ImportLoginTokenResult> => {
+  const dataDir = process.env.DATA_DIR || '/data';
+  const client = new MTProto({
+    api_id: API_ID,
+    api_hash: API_HASH,
+    storageOptions: { path: `${dataDir}/mtproto-qr-${Date.now()}-import` },
+  });
 
-interface SignInResult {
-  user: { id: number };
-}
+  const result = await client.call('auth.importLoginToken', {
+    token,
+  }) as {
+    user: { id: number; first_name?: string; last_name?: string };
+  };
 
-export const signIn = async (
-  client: InstanceType<typeof MTProto>,
-  phone: string,
-  code: string,
-  phoneCodeHash: string,
-): Promise<SignInResult> => {
-  const result = await client.call('auth.signIn', {
-    phone_number: phone,
-    phone_code: code,
-    phone_code_hash: phoneCodeHash,
-  }) as { user: { id: number } };
-  return result;
-};
-
-export const saveSession = async (
-  client: InstanceType<typeof MTProto>,
-  userId: number,
-): Promise<void> => {
+  // Save the session
   const dc = client.storage.get('dc');
   const authKey = client.storage.get('auth_key');
   const serverSalt = client.storage.get('server_salt');
@@ -103,11 +107,15 @@ export const saveSession = async (
   const encrypted = encryptSession(sessionData);
 
   const db = getDb();
-  db.run('INSERT OR REPLACE INTO user_sessions (user_id, encrypted_session_data, is_active) VALUES (?, ?, 1)', [
-    userId,
-    encrypted,
-  ]);
+  db.run(
+    'INSERT OR REPLACE INTO user_sessions (user_id, encrypted_session_data, is_active) VALUES (?, ?, 1)',
+    [result.user.id, encrypted],
+  );
+
+  return result;
 };
+
+// ---- Dialogs ----
 
 interface ChannelInfo {
   id: number;
@@ -117,7 +125,7 @@ interface ChannelInfo {
 }
 
 export const getDialogs = async (
-  client: InstanceType<typeof MTProto>,
+  client: MTProtoClient,
 ): Promise<ChannelInfo[]> => {
   const result = await client.call('messages.getDialogs', {
     offset_date: 0,

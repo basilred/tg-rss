@@ -49,13 +49,13 @@ export const SettingsScreen = () => {
   });
 
   const importChannels = useMutation({
-    mutationFn: () => api.subscriptions.import(),
+    mutationFn: () => api.auth.importChannels(),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       alert(`Импортировано ${data.imported} каналов`);
     },
-    onError: () => alert('Ошибка импорта. Проверь, что отправил /login боту.'),
+    onError: () => alert('Ошибка импорта. Убедись, что подключился.'),
   });
 
   const handleSearch = async () => {

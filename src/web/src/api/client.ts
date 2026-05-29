@@ -35,6 +35,21 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ initData }),
       }),
+    exportLoginToken: () =>
+      request<{ tgLoginUrl: string; tokenKey: string; expires: number }>(
+        '/auth/export-login-token',
+        { method: 'POST', body: '{}' },
+      ),
+    importLoginToken: (tokenKey: string) =>
+      request<{ ok: boolean; userId: number }>('/auth/import-login-token', {
+        method: 'POST',
+        body: JSON.stringify({ tokenKey }),
+      }),
+    importChannels: () =>
+      request<{ imported: number }>('/auth/import-channels', {
+        method: 'POST',
+        body: '{}',
+      }),
   },
   channels: {
     search: (q: string) =>
