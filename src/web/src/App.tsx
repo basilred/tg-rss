@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { setToken, api } from './api/client';
 import { useUiStore } from './stores/ui';
 import { FeedScreen } from './components/FeedScreen';
@@ -10,9 +10,6 @@ import { BottomBar } from './components/BottomBar';
 const App = () => {
   const [isAuthed, setIsAuthed] = useState(false);
   const [needsSession, setNeedsSession] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [connectError, setConnectError] = useState('');
-  const [loginUrl, setLoginUrl] = useState('');
   const isSettingsOpen = useUiStore((s) => s.isSettingsOpen);
   const initDataRef = useRef('');
 
@@ -35,23 +32,6 @@ const App = () => {
     });
   }, []);
 
-  const handleConnect = useCallback(async () => {
-    setConnecting(true);
-    setConnectError('');
-
-    try {
-      const initData = initDataRef.current;
-      const { tgLoginUrl } = await api.auth.exportLoginToken(initData);
-
-      // Show the link for user to tap
-      setLoginUrl(tgLoginUrl);
-    } catch (err) {
-      console.error('Connect error:', err);
-      setConnectError('Ошибка подключения. Попробуй ещё раз.');
-      setConnecting(false);
-    }
-  }, []);
-
   if (needsSession) {
     return (
       <div className="app-empty">
@@ -59,32 +39,9 @@ const App = () => {
         <p style={{ marginBottom: 16 }}>
           Чтобы читать каналы, нужно один раз подключиться.
         </p>
-        {!connecting && (
-          <button
-            onClick={handleConnect}
-            className="settings-btn"
-            style={{ fontSize: 16, padding: '12px 24px' }}
-          >
-            Подключиться
-          </button>
-        )}
-        {connecting && loginUrl && (
-          <>
-            <a
-              href={loginUrl}
-              className="settings-btn"
-              style={{ fontSize: 16, padding: '12px 24px', textDecoration: 'none', display: 'inline-block' }}
-            >
-              Открыть подтверждение в Telegram
-            </a>
-            <p style={{ marginTop: 12, color: 'var(--tg-theme-hint-color)', fontSize: 14 }}>
-              Нажми «Разрешить», затем вернись в ленту
-            </p>
-          </>
-        )}
-        {connectError && (
-          <p style={{ marginTop: 12, color: '#e53935', fontSize: 14 }}>{connectError}</p>
-        )}
+        <p style={{ color: 'var(--tg-theme-hint-color)', fontSize: 14 }}>
+          Отправь <b>/login</b> боту в чате.
+        </p>
       </div>
     );
   }
