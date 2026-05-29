@@ -1,5 +1,7 @@
 # TG-RSS — Design Specification
 
+> Superseded note: the original version of this spec treated MTProto as part of the main onboarding path and described read-state synchronization back to Telegram as a default behavior. That is no longer the target architecture. The current decision is documented in `docs/architecture/telegram-mini-app-auth-and-sync.md`: Mini App auth is primary, MTProto is optional Telegram sync, and `read_status` is local app read state unless a future explicit Telegram read-sync feature is added.
+
 ## Overview
 
 RSS-feed-like лента из Telegram-подписок пользователя. Строгий хронологический порядок с возможностью переключения asc/desc. При скролле просмотренные сообщения помечаются прочитанными в самом Telegram через MTProto API. Telegram Mini App с веб-версией.
