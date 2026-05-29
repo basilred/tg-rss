@@ -125,7 +125,9 @@ bot.on('message:text', async (ctx) => {
 
     try {
       const mtproto = createNewClient(`${userId}`);
+      console.log(`User ${userId}: sending code to ${phone}`);
       const { phone_code_hash } = await sendCode(mtproto, phone);
+      console.log(`User ${userId}: code sent, hash received`);
       state.phoneCodeHash = phone_code_hash;
       state.step = 'code';
 
@@ -135,7 +137,7 @@ bot.on('message:text', async (ctx) => {
 
       await ctx.reply('Код отправлен в Telegram. Введи его:');
     } catch (err) {
-      console.error(`User ${userId}: sendCode error`, err);
+      console.error(`User ${userId}: sendCode error`, JSON.stringify(err, null, 2));
       loginStates.delete(userId);
       await ctx.reply('Ошибка при отправке кода. Попробуй /login ещё раз.');
     }
@@ -174,7 +176,7 @@ bot.on('message:text', async (ctx) => {
       pendingClients.delete(userId);
       loginStates.delete(userId);
     } catch (err) {
-      console.error(`User ${userId}: signIn error`, err);
+      console.error(`User ${userId}: signIn error`, JSON.stringify(err, null, 2));
       loginStates.delete(userId);
       pendingClients.delete(userId);
       await ctx.reply('Неверный код или ошибка входа. Отправь /login чтобы попробовать снова.');
