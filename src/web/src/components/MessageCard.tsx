@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useReadObserver } from '../hooks/useReadObserver';
+import { useHaptics } from '../hooks/useHaptics';
 
 interface Props {
   messageId: number;
@@ -23,6 +24,7 @@ export const MessageCard = ({
 }: Props) => {
   const ref = useRef<HTMLDivElement>(null);
   const { observe } = useReadObserver();
+  const haptics = useHaptics();
 
   useEffect(() => {
     if (ref.current && !isRead) {
@@ -38,7 +40,11 @@ export const MessageCard = ({
   });
 
   return (
-    <div ref={ref} className={`message-card ${isRead ? 'message-card-read' : ''}`}>
+    <div
+      ref={ref}
+      className={`message-card ${isRead ? 'message-card-read' : ''}`}
+      onClick={() => haptics.light()}
+    >
       <div className="message-header">
         <div className="message-channel">
           {channelPhoto ? (
