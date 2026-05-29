@@ -26,6 +26,14 @@ export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
     queryFn: () => api.folders.list(),
   });
 
+  const { data: syncStatus } = useQuery({
+    queryKey: ['auth', 'status'],
+    queryFn: () => api.auth.status(),
+    initialData: { telegramSyncConnected },
+  });
+
+  const isTelegramSyncConnected = syncStatus.telegramSyncConnected;
+
   const addSub = useMutation({
     mutationFn: (channelId: number) => api.subscriptions.add(channelId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }),
@@ -77,14 +85,14 @@ export const SettingsScreen = ({ telegramSyncConnected }: Props) => {
 
       <section className="settings-section">
         <h3>Каналы</h3>
-        {!telegramSyncConnected && (
+        {!isTelegramSyncConnected && (
           <p className="settings-hint">
             Для автоматического импорта твоих Telegram-подписок подключи Telegram sync через /login в боте.
           </p>
         )}
         <button
           onClick={() => importChannels.mutate()}
-          disabled={importChannels.isPending || !telegramSyncConnected}
+          disabled={importChannels.isPending || !isTelegramSyncConnected}
           className="settings-btn"
           style={{ width: '100%', marginBottom: 12 }}
         >

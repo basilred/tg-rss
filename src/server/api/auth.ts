@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { verifyInitData, createJwt } from '../auth';
 import { getDb } from '../db';
-import { getClient, getDialogs } from '../mtproto/client';
+import { authMiddleware } from '../middleware/auth';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 
@@ -38,46 +38,14 @@ auth.post('/verify', async (c) => {
   });
 });
 
-auth.post('/import-channels', async (c) => {
-  const { initData } = await c.req.json<{ initData: string }>();
-  if (!initData) return c.json({ error: 'Missing initData' }, 400);
-
-  const user = verifyInitData(initData, BOT_TOKEN);
-  if (!user) return c.json({ error: 'Invalid initData' }, 401);
-
+auth.get('/status', authMiddleware, (c) => {
+  const userId = c.get('userId');
   const db = getDb();
   const session = db
     .query('SELECT is_active FROM user_sessions WHERE user_id = ?')
-    .get(user.id) as { is_active: number } | undefined;
+    .get(userId) as { is_active: number } | undefined;
 
-  if (!session?.is_active) {
-    return c.json({ error: 'No active session. Send /login to the bot first.' }, 400);
-  }
-
-  try {
-    const client = getClient(user.id);
-    const channels = await getDialogs(client);
-
-    const insertChannel = db.prepare(
-      'INSERT OR REPLACE INTO channels (id, username, title, photo_url) VALUES (?, ?, ?, ?)',
-    );
-    const insertSub = db.prepare(
-      'INSERT OR IGNORE INTO subscriptions (user_id, channel_id) VALUES (?, ?)',
-    );
-
-    const tx = db.transaction(() => {
-      for (const ch of channels) {
-        insertChannel.run(ch.id, ch.username, ch.title, ch.photoUrl);
-        insertSub.run(user.id, ch.id);
-      }
-    });
-
-    tx();
-    return c.json({ imported: channels.length });
-  } catch (err) {
-    console.error(`User ${user.id}: import error`, err);
-    return c.json({ error: 'Import failed' }, 500);
-  }
+  return c.json({ telegramSyncConnected: session?.is_active === 1 });
 });
 
 export { auth };

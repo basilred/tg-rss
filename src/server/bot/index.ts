@@ -21,9 +21,8 @@ const loginStates = new Map<number, LoginState>();
 
 bot.command('start', async (ctx) => {
   await ctx.reply(
-    'Привет! Я показываю твои Telegram-каналы как RSS-ленту.\n\n' +
-    'Отправь /login для первоначальной настройки.\n' +
-    'Затем нажми кнопку «Открыть ленту».',
+    'Привет! Mini App открывается без отдельного входа — Telegram сам передаёт приложению безопасные данные пользователя.\n\n' +
+    'Команда /login нужна только для опционального Telegram sync: импорта твоих подписок и будущей синхронизации прочитанного с Telegram.',
   );
 });
 
@@ -43,11 +42,13 @@ bot.command('status', async (ctx) => {
 
   if (session?.is_active) {
     await ctx.reply(
-      `Подключено. Каналов: ${subCount.count}.\n` +
+      `Telegram sync подключён. Каналов: ${subCount.count}.\n` +
       'Если каналы не обновились — нажми «Импортировать каналы» в настройках ленты.',
     );
   } else {
-    await ctx.reply('Не подключено. Отправь /login для настройки.');
+    await ctx.reply(
+      'Telegram sync не подключён. Mini App всё равно работает, но автоматический импорт твоих подписок недоступен. Отправь /login, чтобы подключить sync.',
+    );
   }
 });
 
@@ -61,11 +62,12 @@ bot.command('login', async (ctx) => {
     .get(userId) as { is_active: number } | undefined;
 
   if (existing?.is_active) {
-    await ctx.reply('Уже подключено! Нажми кнопку «Открыть ленту».');
+    await ctx.reply('Telegram sync уже подключён. Нажми кнопку «Открыть ленту».');
     return;
   }
 
   await ctx.reply(
+    'Подключаем опциональный Telegram sync. Он нужен для импорта твоих подписок на каналы.\n\n' +
     'Введи номер телефона в международном формате:\n' +
     'Например: +79161234567\n\n' +
     'Код подтверждения придёт по SMS.',
@@ -113,7 +115,7 @@ bot.on('message:text', async (ctx) => {
       const db = getDb();
       db.run('INSERT OR IGNORE INTO users (id) VALUES (?)', [result.userId]);
 
-      await ctx.reply('Вход выполнен! Импортирую твои каналы...');
+      await ctx.reply('Telegram sync подключён. Импортирую твои каналы...');
 
       const channels = await getDialogs(state.client);
       await saveChannels(result.userId, channels);

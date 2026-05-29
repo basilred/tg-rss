@@ -51,3 +51,24 @@ test('Mini App auth returns a token without requiring MTProto session', async ()
   expect(body.needsSession).toBeUndefined();
   expect(body.user).toEqual({ id: 777, firstName: 'Mini' });
 });
+
+test('auth status reports Telegram sync connection for authenticated user', async () => {
+  const [{ getDb }, { createJwt }] = await Promise.all([
+    import('../db'),
+    import('../auth'),
+  ]);
+  getDb().run(
+    'INSERT OR REPLACE INTO user_sessions (user_id, encrypted_session_data, is_active) VALUES (?, ?, 1)',
+    [777, '{"iv":"test","data":"test"}'],
+  );
+
+  const res = await app.request('/auth/status', {
+    headers: {
+      Authorization: `Bearer ${createJwt(777)}`,
+    },
+  });
+  const body = await res.json();
+
+  expect(res.status).toBe(200);
+  expect(body.telegramSyncConnected).toBe(true);
+});

@@ -44,11 +44,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ initData }),
       }),
-    importChannels: (initData: string) =>
-      request<{ imported: number }>('/auth/import-channels', {
-        method: 'POST',
-        body: JSON.stringify({ initData }),
-      }),
+    status: () =>
+      request<{ telegramSyncConnected: boolean }>('/auth/status'),
   },
   channels: {
     search: (q: string) =>
