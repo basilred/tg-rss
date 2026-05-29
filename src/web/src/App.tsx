@@ -12,6 +12,7 @@ const App = () => {
   const [needsSession, setNeedsSession] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState('');
+  const [loginUrl, setLoginUrl] = useState('');
   const isSettingsOpen = useUiStore((s) => s.isSettingsOpen);
   const initDataRef = useRef('');
 
@@ -40,19 +41,10 @@ const App = () => {
 
     try {
       const initData = initDataRef.current;
-
-      // Get login token
       const { tgLoginUrl } = await api.auth.exportLoginToken(initData);
 
-      // Open login link in Telegram (this will background the Mini App)
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.openTelegramLink(tgLoginUrl);
-      }
-
-      // Show hint — user needs to confirm and reopen
-      setConnectError(
-        'Нажми «Разрешить» в открывшемся окне Telegram, затем вернись в ленту.',
-      );
+      // Show the link for user to tap
+      setLoginUrl(tgLoginUrl);
     } catch (err) {
       console.error('Connect error:', err);
       setConnectError('Ошибка подключения. Попробуй ещё раз.');
@@ -76,10 +68,19 @@ const App = () => {
             Подключиться
           </button>
         )}
-        {connecting && (
-          <p style={{ marginTop: 12, color: 'var(--tg-theme-hint-color)', fontSize: 14 }}>
-            Нажми «Разрешить» в Telegram, затем вернись в ленту
-          </p>
+        {connecting && loginUrl && (
+          <>
+            <a
+              href={loginUrl}
+              className="settings-btn"
+              style={{ fontSize: 16, padding: '12px 24px', textDecoration: 'none', display: 'inline-block' }}
+            >
+              Открыть подтверждение в Telegram
+            </a>
+            <p style={{ marginTop: 12, color: 'var(--tg-theme-hint-color)', fontSize: 14 }}>
+              Нажми «Разрешить», затем вернись в ленту
+            </p>
+          </>
         )}
         {connectError && (
           <p style={{ marginTop: 12, color: '#e53935', fontSize: 14 }}>{connectError}</p>
