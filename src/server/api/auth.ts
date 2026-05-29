@@ -41,7 +41,13 @@ auth.post('/verify', async (c) => {
 // Store pending login tokens in memory
 const pendingTokens = new Map<string, Uint8Array>();
 
-auth.post('/export-login-token', authMiddleware, async (c) => {
+auth.post('/export-login-token', async (c) => {
+  const { initData } = await c.req.json<{ initData: string }>();
+  if (!initData) return c.json({ error: 'Missing initData' }, 400);
+
+  const user = verifyInitData(initData, BOT_TOKEN);
+  if (!user) return c.json({ error: 'Invalid initData' }, 401);
+
   try {
     const result = await exportLoginToken();
     const tokenKey = Buffer.from(result.token).toString('base64url');
@@ -61,9 +67,12 @@ auth.post('/export-login-token', authMiddleware, async (c) => {
   }
 });
 
-auth.post('/import-login-token', authMiddleware, async (c) => {
-  const userId = c.get('userId');
-  const { tokenKey } = await c.req.json<{ tokenKey: string }>();
+auth.post('/import-login-token', async (c) => {
+  const { tokenKey, initData } = await c.req.json<{ tokenKey: string; initData: string }>();
+  if (!initData) return c.json({ error: 'Missing initData' }, 400);
+
+  const user = verifyInitData(initData, BOT_TOKEN);
+  if (!user) return c.json({ error: 'Invalid initData' }, 401);
 
   const token = pendingTokens.get(tokenKey);
   if (!token) {
@@ -84,17 +93,15 @@ auth.post('/import-login-token', authMiddleware, async (c) => {
   }
 });
 
-auth.post('/import-channels', authMiddleware, async (c) => {
-  const userId = c.get('userId');
+auth.post('/import-channels', async (c) => {
+  const { initData } = await c.req.json<{ initData: string }>();
+  if (!initData) return c.json({ error: 'Missing initData' }, 400);
+
+  const user = verifyInitData(initData, BOT_TOKEN);
+  if (!user) return c.json({ error: 'Invalid initData' }, 401);
+
+  const userId = user.id;
   const db = getDb();
-
-  const session = db
-    .query('SELECT is_active FROM user_sessions WHERE user_id = ?')
-    .get(userId) as { is_active: number } | undefined;
-
-  if (!session?.is_active) {
-    return c.json({ error: 'No active session. Connect first.' }, 400);
-  }
 
   try {
     const { getClient } = await import('../mtproto/client');

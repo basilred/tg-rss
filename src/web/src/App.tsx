@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { setToken, api } from './api/client';
 import { useUiStore } from './stores/ui';
 import { FeedScreen } from './components/FeedScreen';
@@ -13,9 +13,11 @@ const App = () => {
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState('');
   const isSettingsOpen = useUiStore((s) => s.isSettingsOpen);
+  const initDataRef = useRef('');
 
   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
+    initDataRef.current = initData || '';
     if (!initData) {
       setToken('dev-token');
       setIsAuthed(true);
@@ -37,8 +39,9 @@ const App = () => {
     setConnectError('');
 
     try {
+      const initData = initDataRef.current;
       // 1. Get login token
-      const { tgLoginUrl, tokenKey } = await api.auth.exportLoginToken();
+      const { tgLoginUrl, tokenKey } = await api.auth.exportLoginToken(initData);
 
       // 2. Open Telegram login link
       if (window.Telegram?.WebApp) {
@@ -51,11 +54,11 @@ const App = () => {
       for (let i = 0; i < 30; i++) {
         await new Promise((r) => setTimeout(r, 2000));
         try {
-          const result = await api.auth.importLoginToken(tokenKey);
+          const result = await api.auth.importLoginToken(tokenKey, initData);
           if (result.ok) {
             // 4. Import channels
             try {
-              await api.auth.importChannels();
+              await api.auth.importChannels(initData);
             } catch {
               // channels will sync via worker
             }
