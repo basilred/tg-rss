@@ -47,62 +47,43 @@ export const clearClient = (userId: number): void => {
   clients.delete(userId);
 };
 
-// ---- QR Code Login ----
+// ---- Phone Login (with SMS to avoid anti-fraud) ----
 
-interface ExportLoginTokenResult {
-  token: Uint8Array;
-  expires: number;
-  tgLoginUrl: string;
-}
-
-export const exportLoginToken = async (): Promise<ExportLoginTokenResult> => {
+const createTempClient = (): MTProtoClient => {
   const dataDir = process.env.DATA_DIR || '/data';
-  const client = new MTProto({
+  return new MTProto({
     api_id: API_ID,
     api_hash: API_HASH,
-    storageOptions: { path: `${dataDir}/mtproto-qr-${Date.now()}` },
+    storageOptions: { path: `${dataDir}/mtproto-login-${Date.now()}` },
   });
-
-  const result = await client.call('auth.exportLoginToken', {
-    api_id: API_ID,
-    api_hash: API_HASH,
-    except_ids: [],
-  }) as {
-    token: Uint8Array;
-    expires: number;
-  };
-
-  const tokenBase64 = Buffer.from(result.token).toString('base64url');
-  const tgLoginUrl = `tg://login?token=${tokenBase64}`;
-
-  return { token: result.token, expires: result.expires, tgLoginUrl };
 };
 
-interface ImportLoginTokenResult {
-  user: { id: number; first_name?: string; last_name?: string };
-}
+export const sendCode = async (
+  client: MTProtoClient,
+  phone: string,
+): Promise<{ phoneCodeHash: string; timeout: number }> => {
+  const result = await client.call('auth.sendCode', {
+    phone_number: phone,
+    settings: { _: 'codeSettings', allow_sms: true, current_number: true },
+  }) as { phone_code_hash: string; timeout: number };
+  return { phoneCodeHash: result.phone_code_hash, timeout: result.timeout || 60 };
+};
 
-export const importLoginToken = async (
-  token: Uint8Array,
-): Promise<ImportLoginTokenResult> => {
-  const dataDir = process.env.DATA_DIR || '/data';
-  const client = new MTProto({
-    api_id: API_ID,
-    api_hash: API_HASH,
-    storageOptions: { path: `${dataDir}/mtproto-qr-${Date.now()}-import` },
-  });
+export const signIn = async (
+  client: MTProtoClient,
+  phone: string,
+  code: string,
+  phoneCodeHash: string,
+): Promise<{ userId: number }> => {
+  const result = await client.call('auth.signIn', {
+    phone_number: phone,
+    phone_code: code,
+    phone_code_hash: phoneCodeHash,
+  }) as { user: { id: number } };
 
-  const result = await client.call('auth.importLoginToken', {
-    token,
-  }) as {
-    user: { id: number; first_name?: string; last_name?: string };
-  };
-
-  // Save the session
   const dc = client.storage.get('dc');
   const authKey = client.storage.get('auth_key');
   const serverSalt = client.storage.get('server_salt');
-
   const sessionData = JSON.stringify({ dc, auth_key: authKey, server_salt: serverSalt });
   const encrypted = encryptSession(sessionData);
 
@@ -112,13 +93,14 @@ export const importLoginToken = async (
     [result.user.id, encrypted],
   );
 
-  return result;
+  return { userId: result.user.id };
 };
 
 // ---- Dialogs ----
 
 interface ChannelInfo {
   id: number;
+  accessHash: string;
   username: string;
   title: string;
   photoUrl: string | null;
@@ -137,6 +119,7 @@ export const getDialogs = async (
     chats: Array<{
       _: string;
       id: number;
+      access_hash?: string | number;
       username?: string;
       title: string;
       photo?: { dc_id: number; id: number; access_hash: number };
@@ -144,11 +127,11 @@ export const getDialogs = async (
   };
 
   const channels: ChannelInfo[] = [];
-
   for (const chat of result.chats) {
     if (chat._ === 'channel') {
       channels.push({
         id: -Math.abs(chat.id),
+        accessHash: chat.access_hash ? String(chat.access_hash) : '',
         username: chat.username || '',
         title: chat.title,
         photoUrl: chat.photo
@@ -157,6 +140,7 @@ export const getDialogs = async (
       });
     }
   }
-
   return channels;
 };
+
+export { createTempClient };

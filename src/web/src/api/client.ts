@@ -31,25 +31,21 @@ const request = async <T>(
 export const api = {
   auth: {
     verify: (initData: string) =>
-      request<{ token?: string; needsSession?: boolean }>('/auth/verify', {
+      request<{
+        token: string;
+        telegramSyncConnected: boolean;
+        user: {
+          id: number;
+          firstName?: string;
+          lastName?: string;
+          username?: string;
+        };
+      }>('/auth/verify', {
         method: 'POST',
         body: JSON.stringify({ initData }),
       }),
-    exportLoginToken: () =>
-      request<{ tgLoginUrl: string; tokenKey: string; expires: number }>(
-        '/auth/export-login-token',
-        { method: 'POST', body: '{}' },
-      ),
-    importLoginToken: (tokenKey: string) =>
-      request<{ ok: boolean; userId: number }>('/auth/import-login-token', {
-        method: 'POST',
-        body: JSON.stringify({ tokenKey }),
-      }),
-    importChannels: () =>
-      request<{ imported: number }>('/auth/import-channels', {
-        method: 'POST',
-        body: '{}',
-      }),
+    status: () =>
+      request<{ telegramSyncConnected: boolean; botUsername: string | null }>('/auth/status'),
   },
   channels: {
     search: (q: string) =>

@@ -11,6 +11,7 @@ export const SCHEMA = [
   )`,
   `CREATE TABLE IF NOT EXISTS channels (
     id INTEGER PRIMARY KEY,
+    access_hash TEXT,
     username TEXT,
     title TEXT NOT NULL,
     photo_url TEXT,

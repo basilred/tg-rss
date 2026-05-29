@@ -16,12 +16,21 @@ read.post('/', async (c) => {
   const db = getDb();
 
   const insert = db.prepare(
-    'INSERT OR IGNORE INTO read_status (user_id, message_id) VALUES (?, ?)',
+    `INSERT OR IGNORE INTO read_status (user_id, message_id)
+     SELECT ?, ?
+     WHERE EXISTS (
+       SELECT 1
+       FROM messages m
+       JOIN subscriptions s ON s.channel_id = m.channel_id
+       WHERE m.id = ?
+         AND s.user_id = ?
+         AND s.is_active = 1
+     )`,
   );
 
   const batch = db.transaction(() => {
     for (const msgId of messageIds) {
-      insert.run(userId, msgId);
+      insert.run(userId, msgId, msgId, userId);
     }
   });
 
