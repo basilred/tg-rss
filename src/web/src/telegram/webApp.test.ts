@@ -29,7 +29,7 @@ beforeAll(() => {
     confirm: () => true,
     alert: () => {},
     innerHeight: 768,
-  } as unknown as Window;
+  } as unknown as typeof globalThis.window;
   globalThis.document = {
     createElement: () => createMockElement(),
   } as unknown as Document;

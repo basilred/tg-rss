@@ -13,6 +13,7 @@ export interface TelegramTheme {
   button_color: string;
   button_text_color: string;
   secondary_bg_color: string;
+  [key: string]: string | undefined;
 }
 
 export interface TelegramPopupButton {
